@@ -421,7 +421,7 @@ const curStep = () => { const q = curQ(); return q ? q.steps[qs(state.active).st
 const WOOD = new Set([B.PLANKS, B.LOG]);
 const ARK_M = 2, ARK_Y0 = 13, ARK_Y1 = 30;
 const inArkArea = (x, y, z) => x >= A.x0 - ARK_M && x < A.x1 + ARK_M && z >= A.z0 - ARK_M && z < A.z1 + ARK_M && y >= ARK_Y0 && y <= ARK_Y1;
-function countPlanks() { // only blocks he placed (world edits) count, so nearby trees or lumber never do
+function countPlanks() { // only blocks the player placed (world edits) count, so nearby trees or lumber never do
   let n = 0; const WD = W * D;
   for (const [k, b] of Object.entries(world.edits)) { if (!WOOD.has(b)) continue; const i = +k, y = Math.floor(i / WD), r = i - y * WD, z = Math.floor(r / W), x = r - z * W; if (world.get(x, y, z) === b && inArkArea(x, y, z)) n++; }
   return n;
