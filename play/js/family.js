@@ -140,7 +140,7 @@ export function levelSetup(o) {
   const body = openScreen('Starting level', { onBack: o.onBack || (o.draft ? () => addPlayer() : () => parentArea()) });
   body.append(h('div', { class: 'muted center' }, `Pick how to set the starting level for ${nm}. You can change it any time in the Parent area.`),
     h('div', { class: 'setupgrid' },
-      h('button', { class: 'card setupopt', 'data-act': 'quiz', onclick: tap(() => placementIntro(o)) }, h('div', { class: 'big' }, '🧭'), h('h3', {}, 'Take the placement quiz'), h('div', {}, age <= 4 ? 'About 3 to 5 minutes. Listening only: pictures and sounds, no reading needed.' : 'About 3 to 6 minutes. Short reading and word questions that adjust as your child answers.')),
+      h('button', { class: 'card setupopt', 'data-act': 'quiz', onclick: tap(() => placementIntro(o)) }, h('div', { class: 'big' }, '🧭'), h('h3', {}, 'Take the placement quiz'), h('div', {}, age <= 4 ? 'About 3 to 5 minutes. Listening only: pictures and sounds, no reading needed.' : 'About 5 to 8 minutes. Short reading and word questions that adjust as your child answers.')),
       h('button', { class: 'card setupopt', 'data-act': 'choose', onclick: tap(() => chooseLevel(o)) }, h('div', { class: 'big' }, '🎚️'), h('h3', {}, 'Choose a level'), h('div', {}, 'A grown-up picks the reading and vocabulary levels.'))));
 }
 export function chooseLevel(o, preset) {
@@ -163,7 +163,7 @@ function finishLevel(o, lv, placement) {
     if (placement) updateProfileState(p.id, st => { st.placement = placement; });
     toast(`${p.name} is ready.`); switchTo(p.id); return;
   }
-  updateProfileState(o.id, st => { st.level.read = lv.read; st.level.vocab = lv.vocab; st.level.how = lv.how; st.level.upStreak = { read: 0, vocab: 0 }; st.level.lowStreak = { read: 0, vocab: 0 };
+  updateProfileState(o.id, st => { st.level.read = lv.read; st.level.vocab = lv.vocab; st.level.how = lv.how; st.level.upStreak = { read: 0, vocab: 0 }; st.level.lowStreak = { read: 0, vocab: 0 }; st.level.recent = { read: [], vocab: [] };
     st.level.history.push({ d: today(), read: lv.read, vocab: lv.vocab, why: lv.how === 'quiz' ? 'Placement quiz' : 'Changed by a parent' }); if (placement) st.placement = placement; });
   if (activeProfile() && o.id === activeProfile().id) dirty = true;
   toast('Level saved.'); (o.after || (() => parentArea()))();
@@ -186,25 +186,27 @@ export function runPlacement(o) {
   const bar = h('div', { class: 'pbar' }, h('i')); const stage = h('div', { class: 'pstage' }); const cheer = h('div', { class: 'pcheer', 'aria-live': 'polite' });
   body.append(bar, stage, cheer);
   const spoken = x => x.type === 'dec' || x.type === 'letter' || x.type === 'rhyme' || x.type === 'first' || x.type === 'vpic';
-  const promptSay = x => x.type === 'dec' ? `Tap the word: ${x.word}.` : x.type === 'letter' ? x.prompt : x.prompt;
+  const promptSay = x => x.type === 'dec' ? `Tap the word: ${x.word}.` : x.type === 'spell' ? x.word : x.prompt;
+  // passage with the bold word (context clues), like the Context Clues game
+  const passageEl = x => { if (!x.bold) return x.passage; const parts = x.passage.split(new RegExp('(' + x.bold + ')', 'i')); return parts.map(p => p.toLowerCase() === x.bold.toLowerCase() ? h('b', {}, p) : p); };
   
   function show() {
     it = P.next(); if (!it) return done();
     busy = false; stage.innerHTML = ''; cheer.textContent = '';
-    bar.firstChild.style.width = Math.min(100, Math.round(P.total / 24 * 100)) + '%';
-    const hear = h('button', { class: 'btn hear', 'data-act': 'hear', onclick: tap(() => say(promptSay(it), { slow: it.type === 'dec' })) }, '🔊 Hear it again');
+    bar.firstChild.style.width = Math.min(100, Math.round(P.total / 26 * 100)) + '%';
+    const hear = h('button', { class: 'btn hear', 'data-act': 'hear', onclick: tap(() => say(promptSay(it), { slow: it.type === 'dec' || it.type === 'spell' })) }, it.type === 'spell' ? '🔊 Hear the word' : '🔊 Hear it again');
     let text;
     if (it.type === 'dec') text = 'Listen. Tap the word you hear.';
     else if (it.type === 'letter') text = 'Listen. Tap the letter you hear.';
     else if (listen) text = '';
     else text = it.prompt;
     stage.append(h('div', { class: 'pq', 'data-type': it.type, 'data-lv': String(it.lv) }, text ? h('div', { class: 'pprompt' }, text) : null,
-      it.show ? h('div', { class: 'pshow' }, it.show) : null,
-      it.passage ? h('div', { class: 'ppassage' }, it.passage) : null, it.question ? h('div', { class: 'pquestion' }, it.question) : null,
-      (spoken(it) || listen || it.type === 'vmean' || it.type === 'syn') ? hear : null));
+      it.show ? h('div', { class: 'pshow fit' }, it.show) : null,
+      it.passage ? h('div', { class: 'ppassage' }, passageEl(it)) : null, it.question ? h('div', { class: 'pquestion' }, it.question) : null,
+      (spoken(it) || listen || it.type === 'vmean' || it.type === 'syn' || it.type === 'spell') ? hear : null));
     const wrap = h('div', { class: 'pchoices' + (it.choices.some(c => c.pic) ? ' pics' : '') + (it.choices.some(c => c.big) ? ' bigtext' : '') });
     it.choices.forEach(c => {
-      const b = h('button', { class: 'pchoice', 'data-v': c.v, 'aria-label': c.pic ? c.v : c.text }, c.pic ? h('span', { class: 'emoji' }, c.pic) : null, c.text ? h('span', { class: 'ptext' }, c.text) : null);
+      const b = h('button', { class: 'pchoice', 'data-v': c.v, 'aria-label': c.pic ? c.v : c.text }, c.pic ? h('span', { class: 'emoji' }, c.pic) : null, c.text ? h('span', { class: 'ptext' + (c.big ? ' fit' : '') }, c.text) : null);
       b.addEventListener('click', tap(() => { if (busy) return; busy = true; b.classList.add('picked'); P.answer(c.v); Sound.tap && Sound.tap();
         const ph = pick(BAND_PHRASES[band].placement); cheer.textContent = ph; say(ph); setTimeout(show, 900); }));
       const row = h('div', { class: 'pchoice-row' }, b, (it.speakChoices || (c.pic && (listen || it.names))) ? h('button', { class: 'btn spk', 'aria-label': 'Hear ' + c.v, onclick: tap(() => say(c.text || c.v)) }, '🔊') : null);
@@ -214,7 +216,7 @@ export function runPlacement(o) {
     if (spoken(it) || listen || it.type === 'vmean' || it.type === 'syn') say(promptSay(it), { slow: it.type === 'dec' });
   }
   function done() {
-    const r = P.result(); const res = { date: today(), age, listeningOnly: listen, reading: r.reading, vocab: r.vocab, items: r.items, byType: r.byType, log: r.log };
+    const r = P.result(); const res = { date: today(), age, listeningOnly: listen, reading: r.reading, vocab: r.vocab, items: r.items, byType: r.byType, log: r.log, levels: r.levels, v: 2 };
     if (listen) res.reading = Math.min(res.reading, 1); // pre-readers start at Pre-K or K
     const body2 = openScreen('All done!', { onBack: () => levelSetup(o) });
     body2.append(h('div', { class: 'card center intro' }, h('h3', {}, band === 'teen' ? 'Done. Thanks.' : 'You did it! Thank you!'), h('div', {}, `${r.items} questions answered.`),
@@ -228,9 +230,16 @@ export function placementSummary(res) {
   return h('div', { class: 'card psum' },
     h('div', {}, h('b', {}, 'Reading: '), lvName(res.reading), ' — ', READ_DESC[clampLv(res.reading)]),
     h('div', {}, h('b', {}, 'Vocabulary: '), lvName(res.vocab), ' — ', VOCAB_DESC[clampLv(res.vocab)]),
-    h('div', { class: 'muted small' }, `${res.date} · ${res.items} questions · ${res.listeningOnly ? 'listening-only version' : 'reading and vocabulary version'} · started at the level suggested for age ${res.age}`),
+    h('div', { class: 'muted small' }, `${res.date} · ${res.items} questions · ${res.listeningOnly ? 'listening-only version' : 'reading and vocabulary version'} · ${res.v >= 2 ? `started one level below the usual level for age ${res.age}` : `started at the level suggested for age ${res.age}`}`),
     h('div', { class: 'tablewrap' }, h('table', { class: 'rc' }, h('tr', {}, h('th', {}, 'Question type'), h('th', {}, 'Correct'), h('th', {}, 'Hardest correct')), rows)),
+    res.levels ? levelTable(res) : null,
+    res.levels ? h('div', { class: 'muted small' }, 'How the level is chosen: questions at each level come from the same word lists the games use. A level counts as passed at about 70% or better after allowing for lucky guesses, and the top level is checked with extra questions. Levels more than 2 grades above the usual level for the child’s age need very strong proof. You can always adjust the level.') : null,
     h('div', { class: 'muted small disclaimer' }, DISCLAIMER));
+}
+function levelTable(res) {
+  const names = { read: 'Reading', phono: 'Listening skills', vocab: 'Vocabulary' };
+  const rows = Object.entries(res.levels).map(([d, list]) => h('tr', {}, h('td', {}, names[d] || d), h('td', {}, list.map(x => `${lvName(x.lv)}: ${x.ok} of ${x.n}`).join(' · ') || '–')));
+  return h('div', { class: 'tablewrap' }, h('table', { class: 'rc' }, h('tr', {}, h('th', {}, 'Area'), h('th', {}, 'Levels checked (right answers)')), rows));
 }
 function results(o, res) {
   const body = openScreen('Placement results', { onBack: () => levelSetup(o) });

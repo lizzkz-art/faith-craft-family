@@ -384,3 +384,14 @@ body.age-teen .gnext { background: #d6dbe2; color: #22262c; }
 .emo-choice .emo { font-size: 3.2em; }
 .emo-choice { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 120px; }
 .choices.emochoices { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+/* Auto-fit big words (js/fit.js): one line, measured and shrunk to fit; wrap only below the minimum size */
+.fit, .bigword, .ra-target:not(.sentence), .chunks.word, .dragword, .pshow, .built, .wc-head b, .choices.letters .choice, .pchoices.bigtext .ptext, .bucket.choice > span, .tile { white-space: nowrap; min-width: 0; max-width: 100%; }
+.ra-target.sentence { overflow-wrap: break-word; }
+.dragword { max-width: 100%; }
+.ra-target .syl { display: inline-block; }
+.pchoices.bigtext .ptext { display: block; }
+.wc-head b { flex: 1 1 auto; overflow: hidden; }
+.wp-word .fit { flex: 1 1 auto; }
+.pchoice, .pchoice-row, .choice, .choice-row, .choices, .pchoices > * { min-width: 0; }
+.fit-wrap { white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.chunks.word .chunk { display: inline-block; }

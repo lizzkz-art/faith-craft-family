@@ -11,9 +11,10 @@ import * as F from './family.js';
 import * as UI from './ui.js';
 import { Sound } from './audio.js';
 import { Speech } from './speech.js';
+import { initFit } from './fit.js';
 
 const $ = s => document.querySelector(s);
-loadState(); if (activeProfile()) applyMissionTier(missionTier(clampLv(state.level.read))); Speech.init(); Speech.onPlaying(on => Music.duck(on));
+loadState(); if (activeProfile()) applyMissionTier(missionTier(clampLv(state.level.read))); Speech.init(); Speech.onPlaying(on => Music.duck(on)); initFit();
 const pick = a => a[Math.random() * a.length | 0];
 
 // ---------- Renderer ----------

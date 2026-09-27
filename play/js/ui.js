@@ -59,7 +59,7 @@ export function wordPopup(word) {
   if (Speech.available) Speech.speak(clean, { slow: true });
   const info = lookup(clean);
   const pop = $('#wordpop'); pop.innerHTML = '';
-  pop.append(h('div', { class: 'wp-word' }, clean, speakBtn(() => clean, { slow: true })),
+  pop.append(h('div', { class: 'wp-word' }, h('span', { class: 'fit' }, clean), speakBtn(() => clean, { slow: true })),
     h('div', { class: 'wp-def' }, info ? info.def : 'Tap the speaker to hear this word.'),
     ...(info && info.ex ? [h('div', { class: 'wp-ex' }, 'Example: ' + info.ex)] : []),
     h('button', { class: 'btn small', onclick: tap(() => pop.classList.add('hidden')) }, 'Close'));
@@ -118,20 +118,34 @@ function recordSkill(skill, ok, total, lv) {
   r.best = Math.max(r.best, pct); r.latest = pct; r.tries++; r.last = today(); r.lv = lv;
   r.history.push({ pct, lv, d: today() }); if (r.history.length > 20) r.history.shift();
 }
-// Keeps adapting after placement: up one level after 3 sessions in a row at 85% or better,
-// down one (gently) after 2 sessions in a row under 50%. A parent can lock the level.
+// Keeps adapting after placement: up one level after 3 sessions in a row at 85% or better.
+// Down faster when the level is clearly too hard: down one after 2 sessions in a row under 60%
+// (or 3 of the last 4), and down two after 2 sessions in a row under 40%. A parent can lock the level.
+export const ADJ = { up: 85, upN: 3, low: 60, lowN: 2, veryLow: 40 };
+export function adjustLevel(L, domain, pct, cur) {
+  L.upStreak ||= { read: 0, vocab: 0 }; L.lowStreak ||= { read: 0, vocab: 0 }; L.recent ||= { read: [], vocab: [] };
+  const rec = (L.recent[domain] ||= []); rec.push(pct); if (rec.length > 4) rec.shift();
+  if (pct >= ADJ.up) { L.upStreak[domain] = (L.upStreak[domain] || 0) + 1; L.lowStreak[domain] = 0; }
+  else if (pct < ADJ.low) { L.lowStreak[domain] = (L.lowStreak[domain] || 0) + 1; L.upStreak[domain] = 0; }
+  else { L.upStreak[domain] = 0; L.lowStreak[domain] = 0; }
+  const name = domain === 'vocab' ? 'Vocabulary' : 'Reading';
+  const move = (to, why) => { L[domain] = Math.max(0, Math.min(9, to)); L.upStreak[domain] = 0; L.lowStreak[domain] = 0; L.recent[domain] = []; L.history.push({ d: today(), read: L.read, vocab: L.vocab, why: name + ' ' + why }); };
+  if (L.upStreak[domain] >= ADJ.upN && cur < 9) { move(cur + 1, 'up after 3 high scores'); return 'up'; }
+  if (cur > 0) {
+    const last2 = rec.slice(-2);
+    if (last2.length === 2 && last2.every(p => p < ADJ.veryLow)) { move(cur - (cur >= 2 ? 2 : 1), 'eased after 2 very hard sessions'); return 'down'; }
+    if (L.lowStreak[domain] >= ADJ.lowN) { move(cur - 1, 'eased after 2 hard sessions'); return 'down'; }
+    if (rec.length >= 4 && rec.filter(p => p < ADJ.low).length >= 3) { move(cur - 1, 'eased after 3 hard sessions out of 4'); return 'down'; }
+  }
+  return null;
+}
 function afterActivity(pct, lv, domain = 'read') {
   state.xp = (state.xp || 0) + Math.round(pct / 10) * (lv + 1);
   const L = state.level; if (L.lock) { saveState(); return null; }
-  const cur = domain === 'vocab' ? vocabLv() : readLv(); let msg = null;
+  const cur = domain === 'vocab' ? vocabLv() : readLv();
   if (lv !== cur) { saveState(); return null; }
-  if (pct >= 85) { L.upStreak[domain] = (L.upStreak[domain] || 0) + 1; L.lowStreak[domain] = 0; }
-  else if (pct < 50) { L.lowStreak[domain] = (L.lowStreak[domain] || 0) + 1; L.upStreak[domain] = 0; }
-  else { L.upStreak[domain] = 0; L.lowStreak[domain] = 0; }
-  const B = BAND_PHRASES[band()];
-  if (L.upStreak[domain] >= 3 && cur < 9) { L[domain] = cur + 1; L.upStreak[domain] = 0; msg = B.levelUp; L.history.push({ d: today(), read: L.read, vocab: L.vocab, why: (domain === 'vocab' ? 'Vocabulary' : 'Reading') + ' up after 3 high scores' }); }
-  if (L.lowStreak[domain] >= 2 && cur > 0) { L[domain] = cur - 1; L.lowStreak[domain] = 0; msg = B.levelDown; L.history.push({ d: today(), read: L.read, vocab: L.vocab, why: (domain === 'vocab' ? 'Vocabulary' : 'Reading') + ' eased after 2 hard sessions' }); }
-  saveState(); return msg;
+  const B = BAND_PHRASES[band()]; const r = adjustLevel(L, domain, pct, cur);
+  saveState(); return r === 'up' ? B.levelUp : r === 'down' ? B.levelDown : null;
 }
 export function readingLevel() { return 1 + Math.floor((state.xp || 0) / 100); }
 export const lvName = lv => LV_SHORT[clampLv(lv)];
@@ -564,7 +578,7 @@ export function reportCard(o = {}) {
   const { name, groups, missions } = reportData(st, prof); const L = st.level;
   body.append(h('div', { class: 'card rc-top' }, h('h3', {}, `${name}’s Report Card`),
     h('div', { class: 'rc-stats' }, stat('Reading level', lvName(L.read)), stat('Vocabulary level', lvName(L.vocab)), stat('Stars', st.stars), stat('Words learned', Object.keys(st.words).length), stat('Speech practice', st.speechCount || 0), stat('Time played', fmtTime(st.time))),
-    h('div', { class: 'muted small' }, L.lock ? 'Levels are locked by a parent.' : 'Levels adjust automatically: up after 3 sessions at 85% or better, down gently after 2 hard sessions.')));
+    h('div', { class: 'muted small' }, L.lock ? 'Levels are locked by a parent.' : 'Levels adjust automatically: up after 3 sessions in a row at 85% or better; down one after 2 hard sessions in a row (under 60%), or down two after 2 very hard sessions (under 40%).')));
   const row = ({ name, r }) => h('tr', {}, h('td', {}, name), h('td', {}, r ? `${r.best}%` : '–'), h('td', {}, r ? `${r.latest}%` : '–'), h('td', {}, r ? r.tries : 0), h('td', { class: r && r.best >= 80 ? 'met' : '' }, r ? (r.best >= 80 ? '✓ Goal met' : 'Practicing') : '–'), h('td', {}, r && r.lv != null ? lvName(r.lv) : '–'), h('td', {}, r ? r.last : '–'));
   for (const [title, list] of groups) body.append(h('h3', {}, title), h('div', { class: 'tablewrap' }, h('table', { class: 'rc' }, h('tr', {}, ['Skill', 'Best', 'Latest', 'Tries', 'Goal 80%', 'Level', 'Last tried'].map(t => h('th', {}, t))), list.length ? list.map(row) : h('tr', {}, h('td', { colspan: '7', class: 'muted' }, 'Not practiced yet.')))));
   body.append(h('h3', {}, 'Missions and Story Checks'), h('div', { class: 'tablewrap' }, h('table', { class: 'rc' },
