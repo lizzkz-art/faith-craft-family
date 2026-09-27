@@ -71,4 +71,15 @@ export const BAND_PHRASES = {
 export const SKINS = ['#f3d2b3', '#e3a97e', '#c68b59', '#9a6440', '#6b4428'];
 export const HAIRS = ['#2a1b10', '#5a3818', '#a0612a', '#e2c16b', '#b8412c', '#8a8a8a'];
 export const SHIRTS = ['#2bb3a3', '#4a90d9', '#e25a5a', '#8e5cc7', '#f0a030', '#3aa76d', '#555c66'];
+// Hair style, accessory, and outfit choices (stored in each profile's look; missing = the first option)
+export const HAIR_STYLES = [['short', 'Short'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['pigtails', 'Pigtails'], ['braids', 'Braids'], ['puffs', 'Curly puffs']];
+export const ACCESSORIES = [['none', 'None'], ['bow', 'Bow'], ['headband', 'Headband']];
+export const OUTFITS = [['pants', 'Shirt and pants'], ['dress', 'Dress']];
+export const BOW_COLOR = '#ff5c9a';
+const pickOpt = (v, list) => (list.find(o => o[0] === v) || list[0])[0];
+// Fills in defaults so old saved profiles (no style fields) keep the original look
+export function normLook(look) {
+  const L = look || {};
+  return { skin: L.skin ?? 1, hair: L.hair ?? 1, shirt: L.shirt ?? 0, hairStyle: pickOpt(L.hairStyle, HAIR_STYLES), acc: pickOpt(L.acc, ACCESSORIES), outfit: pickOpt(L.outfit, OUTFITS) };
+}
 export const FOCUS_SOUNDS = { r: 'R', l: 'L', s: 'S', th: 'TH', bl: 'Blends' };

@@ -172,7 +172,7 @@ function updateCamera(dt, playing) {
   playerModel.visible = playing && cam.dist > 0.9;
   playerModel.position.set(P.pos.x, footY, P.pos.z); playerModel.rotation.y = P.yaw + Math.PI;
   const U = playerModel.userData, sw = Math.sin(cam.phase) * 0.7 * cam.amt, calm = state.settings.calm;
-  U.legL.rotation.x = sw; U.legR.rotation.x = -sw; U.armL.rotation.x = -sw * 0.8; U.armR.rotation.x = sw * 0.8 - (hand.swing > 0 ? Math.sin(hand.swing * Math.PI) * 1.2 : 0);
+  U.legL.rotation.x = sw * U.legSwing; U.legR.rotation.x = -sw * U.legSwing; U.armL.rotation.x = -sw * 0.8; U.armR.rotation.x = sw * 0.8 - (hand.swing > 0 ? Math.sin(hand.swing * Math.PI) * 1.2 : 0);
   U.armL.rotation.z = -0.04 - (calm ? 0 : Math.sin(performance.now() / 900) * 0.02); U.armR.rotation.z = 0.04;
   U.head.rotation.x = -P.pitch * 0.5; U.rig.position.y = Math.abs(Math.sin(cam.phase)) * 0.05 * cam.amt;
 }
@@ -715,7 +715,7 @@ function updateNPCs(dt, now) {
       } else if (near) { n.tx = null; turnTo(n, Math.atan2(dxp, dzp), dt * 2.5); }
       n.sw += ((moving ? 1 : 0) - n.sw) * Math.min(1, dt * 7); if (moving) n.ph += dt * 6.5;
       const sw = Math.sin(n.ph) * 0.5 * n.sw;
-      U.legL.rotation.x = sw; U.legR.rotation.x = -sw;
+      U.legL.rotation.x = sw * U.legSwing; U.legR.rotation.x = -sw * U.legSwing;
       const idle = calm ? 0 : Math.sin(n.t * 1.5) * 0.06 * (1 - n.sw);
       U.armL.rotation.x = -sw * 0.8 + idle;
       // wave hello when you walk up

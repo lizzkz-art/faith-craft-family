@@ -1,6 +1,6 @@
 // Faith Craft Family Edition: who's playing, add player, level setup, placement quiz, parent area.
 import { meta, saveMeta, profiles, activeProfile, getProfile, setActive, createProfile, updateProfile, deleteProfile, resetProfile, readProfileState, updateProfileState, state, saveState, MAX_PROFILES } from './save.js';
-import { LV_SHORT, READ_DESC, VOCAB_DESC, clampLv, AGES, ageBand, BAND_PHRASES, SKINS, HAIRS, SHIRTS, FOCUS_SOUNDS } from './levels.js';
+import { LV_SHORT, READ_DESC, VOCAB_DESC, clampLv, AGES, ageBand, BAND_PHRASES, SKINS, HAIRS, SHIRTS, FOCUS_SOUNDS, HAIR_STYLES, ACCESSORIES, OUTFITS, BOW_COLOR, normLook } from './levels.js';
 import { createPlacement, startLevels, TYPE_NAMES } from './placement.js';
 import { SCHOOL_TOPICS } from './curriculum.js';
 import { h, tap, openScreen, closeScreen, toast, pinPad, settingsGate, reportCard, settings, title } from './ui.js';
@@ -14,10 +14,58 @@ const pick = a => a[Math.random() * a.length | 0];
 const say = (t, o = {}) => { try { Speech.speak(t, o); } catch (e) { } };
 export const DISCLAIMER = 'The placement quiz is a quick starting-point estimate, not a formal reading assessment.';
 
-// A small blocky face that matches the player's look
+// A small blocky face that matches the player's look (hair style, accessory, and outfit included)
+const shade = (hex, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+const R = (x, y, w, hh, c, rx, stroke) => `<rect x="${x}" y="${y}" width="${w}" height="${hh}"${rx ? ` rx="${rx}"` : ''} fill="${c}"${stroke ? ` stroke="${stroke}" stroke-width="1.5"` : ''}/>`;
+function bowSVG(cx, y) { return R(cx - 11, y, 9, 9, BOW_COLOR, 1) + R(cx + 2, y, 9, 9, BOW_COLOR, 1) + R(cx - 3, y + 1, 6, 7, shade(BOW_COLOR, 0.72), 1); }
 export function faceSVG(look = {}, size = 64) {
-  const sk = SKINS[look.skin ?? 1], hr = HAIRS[look.hair ?? 1], sh = SHIRTS[look.shirt ?? 0];
-  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true"><rect x="0" y="50" width="64" height="14" fill="${sh}"/><rect x="12" y="8" width="40" height="42" rx="3" fill="${sk}"/><rect x="10" y="4" width="44" height="12" fill="${hr}"/><rect x="10" y="4" width="6" height="24" fill="${hr}"/><rect x="48" y="4" width="6" height="24" fill="${hr}"/><rect x="21" y="26" width="7" height="7" fill="#fff"/><rect x="36" y="26" width="7" height="7" fill="#fff"/><rect x="23" y="28" width="4" height="5" fill="#2a4a8a"/><rect x="38" y="28" width="4" height="5" fill="#2a4a8a"/><rect x="25" y="40" width="14" height="3" fill="#b04a3e"/></svg>`;
+  const L = normLook(look), sk = SKINS[L.skin] || SKINS[1], hr = HAIRS[L.hair] || HAIRS[1], sh = SHIRTS[L.shirt] || SHIRTS[0], hd = shade(hr, 0.72), st = L.hairStyle;
+  const tie = L.acc === 'bow' ? BOW_COLOR : shade(hr, 0.55);
+  let back = '', front = '', top = '';
+  // shirt or dress at the bottom
+  let clothes = R(0, 50, 64, 14, sh);
+  if (L.outfit === 'dress') clothes += R(0, 50, 11, 8, shade(sh, 1.18)) + R(53, 50, 11, 8, shade(sh, 1.18)) + R(22, 50, 20, 4, sk) + R(18, 54, 4, 3, '#ffffff') + R(42, 54, 4, 3, '#ffffff') + R(22, 54, 20, 3, '#ffffff');
+  if (st === 'long') {
+    back = R(8, 6, 48, 46, hr);
+    front = R(8, 6, 8, 46, hr) + R(48, 6, 8, 46, hr) + R(6, 46, 12, 18, hr) + R(46, 46, 12, 18, hr) + R(9, 52, 2, 12, hd) + R(53, 52, 2, 12, hd);
+    top = R(10, 4, 44, 11, hr) + R(12, 13, 8, 4, hr) + R(44, 13, 8, 4, hr);
+  } else if (st === 'ponytail') {
+    back = R(47, 3, 14, 10, hr, 4, hd) + R(52, 10, 11, 38, hr, 3, hd) + R(54, 44, 7, 6, hd);
+    front = R(10, 4, 6, 22, hr) + R(48, 4, 6, 22, hr) + R(47, 6, 7, 8, tie);
+    top = R(10, 4, 44, 12, hr);
+  } else if (st === 'pigtails') {
+    back = R(0, 20, 11, 28, hr, 3, hd) + R(53, 20, 11, 28, hr, 3, hd) + R(2, 43, 7, 6, hd) + R(55, 43, 7, 6, hd);
+    front = R(10, 4, 6, 24, hr) + R(48, 4, 6, 24, hr) + R(3, 14, 9, 7, tie) + R(52, 14, 9, 7, tie);
+    top = R(10, 4, 44, 12, hr) + R(31, 4, 2, 10, hd);
+  } else if (st === 'braids') {
+    front = R(10, 4, 6, 32, hr) + R(48, 4, 6, 32, hr);
+    for (let i = 0; i < 3; i++) { const y = 34 + i * 8, dx = i % 2 ? 1 : -1; front += R(9 + dx, y, 8, 8, i % 2 ? hd : hr, 2) + R(47 - dx, y, 8, 8, i % 2 ? hd : hr, 2); }
+    front += R(9, 58, 8, 4, tie) + R(47, 58, 8, 4, tie);
+    top = R(10, 4, 44, 12, hr) + R(31, 4, 2, 10, hd);
+  } else if (st === 'puffs') {
+    back = R(1, 0, 20, 19, hr, 7) + R(43, 0, 20, 19, hr, 7);
+    front = R(10, 6, 5, 16, hr) + R(49, 6, 5, 16, hr) + R(5, 4, 3, 3, hd) + R(12, 8, 3, 3, hd) + R(7, 12, 3, 3, hd) + R(49, 4, 3, 3, hd) + R(56, 8, 3, 3, hd) + R(52, 12, 3, 3, hd);
+    top = R(12, 6, 40, 9, hr);
+  } else {
+    front = R(10, 4, 6, 24, hr) + R(48, 4, 6, 24, hr);
+    top = R(10, 4, 44, 12, hr);
+  }
+  let acc = '';
+  if (L.acc === 'headband') acc = R(10, 11, 44, 4, sh === BOW_COLOR ? '#ffffff' : shade(sh, 1.1)) + R(10, 11, 44, 1, shade(sh, 1.35));
+  else if (L.acc === 'bow') acc = st === 'puffs' ? bowSVG(32, 0) : st === 'pigtails' ? bowSVG(8, 12) + bowSVG(56, 12) : st === 'ponytail' ? bowSVG(51, 3) : bowSVG(45, 0);
+  const faceParts = R(12, 8, 40, 42, sk, 3) + R(21, 26, 7, 7, '#fff') + R(36, 26, 7, 7, '#fff') + R(23, 28, 4, 5, '#2a4a8a') + R(38, 28, 4, 5, '#2a4a8a') + R(25, 40, 14, 3, '#b04a3e');
+  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${back}${clothes}${st === 'long' ? front + faceParts : faceParts + front}${top}${acc}</svg>`;
+}
+// Full blocky figure (for the outfit choice and the big preview)
+export function figureSVG(look = {}, size = 64) {
+  const L = normLook(look), sk = SKINS[L.skin] || SKINS[1], hr = HAIRS[L.hair] || HAIRS[1], sh = SHIRTS[L.shirt] || SHIRTS[0], dress = L.outfit === 'dress';
+  const backHair = L.hairStyle === 'long' ? R(19, 2, 26, 32, hr) : '';
+  const hair = L.hairStyle === 'long' ? R(20, 2, 24, 6, hr) : L.hairStyle === 'puffs' ? R(14, 0, 12, 11, hr, 4) + R(38, 0, 12, 11, hr, 4) + R(20, 3, 24, 5, hr) : R(20, 2, 24, 7, hr);
+  const face = R(22, 4, 20, 18, sk) + R(26, 11, 3, 3, '#2a4a8a') + R(35, 11, 3, 3, '#2a4a8a') + R(29, 17, 6, 1.5, '#b04a3e') + (L.hairStyle === 'long' ? R(19, 4, 4, 30, hr) + R(41, 4, 4, 30, hr) : R(22, 4, 20, 3, hr));
+  const arms = R(12, 23, 7, 7, sh) + R(45, 23, 7, 7, sh) + R(13, 30, 5, 13, sk) + R(46, 30, 5, 13, sk);
+  const bodyP = dress ? R(20, 22, 24, 18, sh) + R(27, 22, 10, 2, sk) + R(16, 38, 32, 12, sh) + R(16, 48, 32, 2, shade(sh, 0.75)) + R(23, 50, 7, 8, sk) + R(34, 50, 7, 8, sk) + R(23, 56, 7, 2, '#ffffff') + R(34, 56, 7, 2, '#ffffff')
+    : R(20, 22, 24, 20, sh) + R(20, 40, 24, 2, shade(sh, 0.75)) + R(21, 42, 10, 16, '#3a5da8') + R(33, 42, 10, 16, '#3a5da8');
+  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${backHair}${arms}${bodyP}${R(dress ? 22 : 20, 58, dress ? 9 : 12, 5, '#3b2d24')}${R(dress ? 33 : 32, 58, dress ? 9 : 12, 5, '#3b2d24')}${hair}${face}</svg>`;
 }
 function bandClass(age) { const b = document.body; b.classList.remove('age-young', 'age-mid', 'age-teen'); b.classList.add('age-' + ageBand(age)); b.classList.toggle('prereader', age <= 4); }
 function restoreBand() { const p = activeProfile(); if (p) bandClass(p.age); else document.body.classList.remove('age-young', 'age-mid', 'age-teen', 'prereader'); if (p) document.body.classList.toggle('prereader', clampLv(state.level.read) === 0); }
@@ -47,19 +95,40 @@ export function whoIsPlaying() {
     h('div', { class: 'muted small center' }, `Up to ${MAX_PROFILES} players. Saves stay on this device only.`));
 }
 
+// Look picker used by Add player and Edit player: colors plus hair style, accessory, and outfit, each with preview icons
+function lookPicker(look) {
+  Object.assign(look, normLook(look));
+  const prev = h('div', { class: 'lookprev' }); const opts = [];
+  const upd = () => { prev.innerHTML = faceSVG(look, 96) + figureSVG(look, 96); opts.forEach(f => f()); };
+  const swatches = (key, cols) => h('div', { class: 'swatches' }, cols.map((c, i) => h('button', { class: 'sw' + (look[key] === i ? ' on' : ''), style: `background:${c}`, 'aria-label': key + ' ' + (i + 1), 'data-look': key, 'data-i': String(i), onclick: tap(e => { look[key] = i; e.currentTarget.parentNode.querySelectorAll('.sw').forEach(b => b.classList.toggle('on', b === e.currentTarget)); upd(); }) })));
+  const choices = (key, list, icon) => {
+    const row = h('div', { class: 'stylepick', role: 'radiogroup', 'aria-label': key });
+    for (const [v, label] of list) {
+      const ic = h('span', { class: 'sticon' });
+      const b = h('button', { class: 'btn stylebtn' + (look[key] === v ? ' on' : ''), 'data-look': key, 'data-v': v, role: 'radio', 'aria-checked': String(look[key] === v), onclick: tap(() => { look[key] = v; row.querySelectorAll('.stylebtn').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); upd(); }) }, ic, h('span', { class: 'stlabel' }, label));
+      opts.push(() => { ic.innerHTML = icon({ ...look, [key]: v }); }); row.append(b);
+    }
+    return row;
+  };
+  const faceIcon = l => faceSVG(l, 56), figIcon = l => figureSVG(l, 56);
+  const el = h('div', { class: 'lookrow' }, prev, h('div', { class: 'lookopts' },
+    h('div', { class: 'small' }, 'Skin'), swatches('skin', SKINS), h('div', { class: 'small' }, 'Hair color'), swatches('hair', HAIRS), h('div', { class: 'small' }, 'Shirt color'), swatches('shirt', SHIRTS),
+    h('div', { class: 'small' }, 'Hair style'), choices('hairStyle', HAIR_STYLES, faceIcon),
+    h('div', { class: 'small' }, 'Accessory'), choices('acc', ACCESSORIES, faceIcon),
+    h('div', { class: 'small' }, 'Outfit'), choices('outfit', OUTFITS, figIcon)));
+  upd(); return el;
+}
+
 // ---------- Add player ----------
 export function addPlayer(onBack) {
-  const n = profiles().length + 1; const look = { skin: 1, hair: 1, shirt: (n - 1) % SHIRTS.length }; let age = 7;
+  const n = profiles().length + 1; const look = normLook({ skin: 1, hair: 1, shirt: (n - 1) % SHIRTS.length }); let age = 7;
   const body = openScreen('Add a player', { onBack: onBack || whoIsPlaying });
   const nameIn = h('input', { type: 'text', maxlength: '20', placeholder: 'Player ' + n, 'aria-label': 'Name', id: 'pname' });
   const ageRow = h('div', { class: 'agepick' }, AGES.map(a => h('button', { class: 'btn agebtn' + (a === age ? ' on' : ''), 'data-age': String(a), onclick: tap(e => { age = a; ageRow.querySelectorAll('.agebtn').forEach(b => b.classList.toggle('on', b === e.currentTarget)); }) }, String(a))));
-  const prev = h('div', { class: 'lookprev' }); const upd = () => { prev.innerHTML = faceSVG(look, 96); };
-  const swatches = (key, cols) => h('div', { class: 'swatches' }, cols.map((c, i) => h('button', { class: 'sw' + (look[key] === i ? ' on' : ''), style: `background:${c}`, 'aria-label': key + ' ' + (i + 1), onclick: tap(e => { look[key] = i; e.currentTarget.parentNode.querySelectorAll('.sw').forEach(b => b.classList.toggle('on', b === e.currentTarget)); upd(); }) })));
-  upd();
   body.append(h('div', { class: 'card form' },
     h('label', { class: 'set' }, h('span', {}, 'Name (optional)'), nameIn),
     h('div', { class: 'set col' }, h('span', {}, 'Age'), ageRow, h('div', { class: 'muted small' }, 'Age sets where the placement quiz starts and how the game talks and looks. Reading level is set separately.')),
-    h('div', { class: 'lookrow' }, prev, h('div', {}, h('div', { class: 'small' }, 'Skin'), swatches('skin', SKINS), h('div', { class: 'small' }, 'Hair'), swatches('hair', HAIRS), h('div', { class: 'small' }, 'Shirt'), swatches('shirt', SHIRTS)))),
+    lookPicker(look)),
     h('div', { class: 'row center' }, h('button', { class: 'btn primary big', 'data-act': 'next', onclick: tap(() => levelSetup({ draft: { name: nameIn.value, age, look } })) }, 'Next: starting level ›')));
 }
 
@@ -236,10 +305,8 @@ function editPanel(p) {
   const body = openScreen(`Edit ${p.name}`, { onBack: parentArea });
   const nameIn = h('input', { type: 'text', maxlength: '20', value: p.name, id: 'pname' });
   const ageSel = h('select', { id: 'page' }, AGES.map(a => { const o = h('option', { value: String(a) }, String(a)); if (a === age) o.selected = true; return o; })); ageSel.addEventListener('change', () => age = Number(ageSel.value));
-  const prev = h('div', { class: 'lookprev' }); const upd = () => { prev.innerHTML = faceSVG(look, 96); }; upd();
-  const swatches = (key, cols) => h('div', { class: 'swatches' }, cols.map((c, i) => h('button', { class: 'sw' + (look[key] === i ? ' on' : ''), style: `background:${c}`, onclick: tap(e => { look[key] = i; e.currentTarget.parentNode.querySelectorAll('.sw').forEach(b => b.classList.toggle('on', b === e.currentTarget)); upd(); }) })));
   body.append(h('div', { class: 'card form' }, h('label', { class: 'set' }, h('span', {}, 'Name'), nameIn), h('label', { class: 'set' }, h('span', {}, 'Age'), ageSel),
     h('div', { class: 'muted small' }, 'Changing age changes the tone and look of the game, not the reading level.'),
-    h('div', { class: 'lookrow' }, prev, h('div', {}, h('div', { class: 'small' }, 'Skin'), swatches('skin', SKINS), h('div', { class: 'small' }, 'Hair'), swatches('hair', HAIRS), h('div', { class: 'small' }, 'Shirt'), swatches('shirt', SHIRTS)))),
+    lookPicker(look)),
     h('div', { class: 'row center' }, h('button', { class: 'btn primary big', 'data-act': 'save', onclick: tap(() => { updateProfile(p.id, { name: nameIn.value.trim().slice(0, 20) || p.name, age, look }); if (activeProfile() && activeProfile().id === p.id) dirty = true; toast('Saved.'); parentArea(); }) }, 'Save')));
 }
