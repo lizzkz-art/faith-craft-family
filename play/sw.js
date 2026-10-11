@@ -1,11 +1,11 @@
 // Faith Craft service worker: caches every file (including the voice recordings) so the game works fully offline.
-const VERSION = 'fcf-pages-p1-3bac7a5002';
+const VERSION = 'fcf-pages-p1-e9ac66a7ef';
 const CACHE = 'fcfamily-' + VERSION;
 const AUDIO_CACHE = 'fcfamily-audio'; // voice clips are named by content, so they survive updates
 const ASSETS = [
   './', './index.html', './manifest.json', './css/style.css',
   './js/game.js', './js/ui.js', './js/data.js', './js/stories.js', './js/phonics.js', './js/icons.js', './js/readaloud.js', './js/intent.js',
-  './js/world.js', './js/textures.js', './js/entities.js', './js/audio.js', './js/music.js', './js/speech.js', './js/save.js', './js/levels.js', './js/bank.js', './js/placement.js', './js/family.js', './js/curriculum.js', './js/fit.js',
+  './js/world.js', './js/textures.js', './js/entities.js', './js/audio.js', './js/music.js', './js/speech.js', './js/save.js', './js/savenote.js', './js/levels.js', './js/bank.js', './js/placement.js', './js/family.js', './js/curriculum.js', './js/fit.js',
   './lib/three.module.js', './audio/index.json', './audio/silence.mp3',
   './fonts/lexend-latin-400-normal.woff2', './fonts/lexend-latin-700-normal.woff2', './fonts/opendyslexic-latin-400-normal.woff2', './fonts/opendyslexic-latin-700-normal.woff2',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',

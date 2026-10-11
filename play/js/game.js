@@ -4,7 +4,8 @@ import { World, W, D, H, CS, B, BLOCKS, PLACES, meshChunk, brookX } from './worl
 import * as E from './entities.js';
 import { NPCS, QUESTS, QUEST_ORDER, NPC_LINES, BLOCK_HOTBAR, HELLOS, PHRASES, TALK } from './data.js';
 import { Music } from './music.js';
-import { state, loadState, saveState, loadWorldEdits, saveWorld, activeProfile } from './save.js';
+import { state, loadState, saveState, loadWorldEdits, saveWorld, activeProfile, initStorage } from './save.js';
+import { initSaveNote } from './savenote.js';
 import { applyMissionTier } from './data.js';
 import { missionTier, clampLv } from './levels.js';
 import * as F from './family.js';
@@ -14,7 +15,8 @@ import { Speech } from './speech.js';
 import { initFit } from './fit.js';
 
 const $ = s => document.querySelector(s);
-loadState(); if (activeProfile()) applyMissionTier(missionTier(clampLv(state.level.read))); Speech.init(); Speech.onPlaying(on => Music.duck(on)); initFit();
+try { await initStorage(); } catch (e) { }
+loadState(); initSaveNote(); if (activeProfile()) applyMissionTier(missionTier(clampLv(state.level.read))); Speech.init(); Speech.onPlaying(on => Music.duck(on)); initFit();
 const pick = a => a[Math.random() * a.length | 0];
 
 // ---------- Renderer ----------

@@ -1,5 +1,5 @@
 // Faith Craft Family Edition: who's playing, add player, level setup, placement quiz, parent area.
-import { meta, saveMeta, profiles, activeProfile, getProfile, setActive, createProfile, updateProfile, deleteProfile, resetProfile, readProfileState, updateProfileState, state, saveState, MAX_PROFILES } from './save.js';
+import { meta, saveMeta, profiles, activeProfile, getProfile, setActive, createProfile, updateProfile, deleteProfile, resetProfile, readProfileState, updateProfileState, state, saveState, MAX_PROFILES, storageInfo, flushAll, exportCode, parseCode, importData, summarize } from './save.js';
 import { LV_SHORT, READ_DESC, VOCAB_DESC, clampLv, AGES, ageBand, BAND_PHRASES, SKINS, HAIRS, SHIRTS, FOCUS_SOUNDS, HAIR_STYLES, ACCESSORIES, OUTFITS, BOW_COLOR, normLook } from './levels.js';
 import { createPlacement, startLevels, TYPE_NAMES } from './placement.js';
 import { SCHOOL_TOPICS } from './curriculum.js';
@@ -266,6 +266,7 @@ export function parentArea() {
   restoreBand();
   const body = openScreen('Parent area', { onBack: leaveParent, backLabel: '‹ Done' });
   body.append(h('div', { class: 'muted center' }, 'Report cards, levels, focus sounds, and players. Saves stay on this device.'));
+  if (!storageInfo.ok) body.append(h('div', { class: 'card', style: 'background:#fff3cd' }, h('b', {}, 'Progress can’t be saved in private mode. '), 'This browser is blocking saving. Open the game in a normal (not private) tab, and see Keep progress safe.'));
   for (const p of profiles()) {
     const st = readProfileState(p.id); const L = st.level; const isActive = activeProfile() && activeProfile().id === p.id;
     body.append(h('div', { class: 'card pcard', 'data-id': p.id },
@@ -283,8 +284,43 @@ export function parentArea() {
   body.append(h('div', { class: 'row center' },
     profiles().length < MAX_PROFILES ? h('button', { class: 'btn big', 'data-act': 'add', onclick: tap(() => addPlayer(parentArea)) }, '+ Add player') : null,
     h('button', { class: 'btn big', 'data-act': 'pin', onclick: tap(() => pinPad('Choose a new 4-digit PIN', v => pinPad('Type it again', v2 => { if (v === v2) { meta.pin = v; saveMeta(); toast('PIN changed.'); } else toast('The PINs did not match.'); }))) }, 'Change PIN'),
+    h('button', { class: 'btn big', 'data-act': 'safe', onclick: tap(safePanel) }, '🛟 Keep progress safe'),
     h('button', { class: 'btn big', 'data-act': 'switch', onclick: tap(whoIsPlaying) }, '👥 Who’s playing')),
     h('div', { class: 'muted small center' }, DISCLAIMER + ' Faith Craft practices reading, vocabulary, and speech skills. It is not a medical or therapy product.'));
+}
+
+// ---------- Keep progress safe: status, export/import code, Fire tablet tips ----------
+function download(name, text) { const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name }); document.body.append(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000); }
+function safePanel() {
+  flushAll();
+  const body = openScreen('Keep progress safe', { onBack: parentArea });
+  const yn = (v, a, b) => v === null ? 'unknown' : v ? a : b;
+  const ta = h('textarea', { id: 'progress-code', rows: '5', style: 'width:100%;font-family:monospace;font-size:13px', placeholder: 'Progress code appears here. To restore, paste a code here and tap Import.' });
+  const msg = h('div', { class: 'small', id: 'safe-msg', role: 'status' });
+  const say2 = t => { msg.textContent = t; };
+  const rows = [
+    ['Saving on this device', storageInfo.ok ? (storageInfo.saveFailed ? 'Problem: last save failed' : 'Working') : 'BLOCKED (private mode or site data blocked)'],
+    ['Backup copy', storageInfo.idb ? 'On (second copy kept automatically)' : 'Not available in this browser (use Export below)'],
+    ['Browser keeps data', yn(storageInfo.persistent, 'Protected', 'Not protected: the browser may clear it when space is low')],
+  ];
+  body.append(h('div', { class: 'card' }, h('h3', {}, 'Status'), rows.map(r => h('div', { class: 'small' }, h('b', {}, r[0] + ': '), r[1])),
+      storageInfo.maybePrivate ? h('div', { class: 'small' }, 'This browser has very little storage. It may be a private tab.') : null),
+    h('div', { class: 'card' }, h('h3', {}, 'Export or import progress'),
+      h('div', { class: 'small' }, 'A progress code holds every player’s progress. Keep a copy somewhere safe (notes, email to yourself). Importing replaces the progress on this device.'),
+      ta, h('div', { class: 'row' },
+        h('button', { class: 'btn', 'data-act': 'export', onclick: tap(async () => { try { ta.value = await exportCode(); ta.select(); say2('Code ready (' + ta.value.length + ' characters). Tap Copy, or Save file.'); } catch (e) { say2('Could not make a code.'); } }) }, 'Make code'),
+        h('button', { class: 'btn', 'data-act': 'copy', onclick: tap(async () => { if (!ta.value) ta.value = await exportCode(); ta.select(); try { await navigator.clipboard.writeText(ta.value); say2('Copied.'); } catch (e) { try { document.execCommand('copy'); say2('Copied.'); } catch (e2) { say2('Press and hold the code to copy it.'); } } }) }, 'Copy'),
+        h('button', { class: 'btn', 'data-act': 'savefile', onclick: tap(async () => { download('faith-craft-family-progress.txt', ta.value || await exportCode()); say2('File saved to Downloads.'); }) }, 'Save file'),
+        h('button', { class: 'btn danger', 'data-act': 'import', onclick: tap(async () => {
+          try { const o = await parseCode(ta.value); const names = summarize(o); confirmBox(`Replace the progress on this device with the code (${names.join(', ') || 'no players'})?`, async () => { try { await importData(o); toast('Progress imported.'); sessionStorage.removeItem(PICKED); location.reload(); } catch (e) { say2(e.message); } }, 'Import'); } catch (e) { say2(e.message || 'That code did not work.'); } }) }, 'Import code'),
+        h('label', { class: 'btn' }, 'Open file', h('input', { type: 'file', accept: '.txt,text/plain', style: 'display:none', onchange: e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { ta.value = String(r.result || '').trim(); say2('File loaded. Tap Import code.'); }; r.readAsText(f); } }))),
+      msg),
+    h('div', { class: 'card small' }, h('h3', {}, 'Amazon Fire tablet tips'),
+      h('ul', {}, h('li', {}, 'Always open the game in the same browser (Silk or Chrome) and use a normal tab, never a private one.'),
+        h('li', {}, 'In Silk: tap ⋮ > Settings > Privacy and security, and turn OFF “Clear browsing data on exit” (or keep cookies and site data checked off).'),
+        h('li', {}, 'Do not use “Delete browsing data” or a phone cleaner app while this game matters. Clearing site data erases progress.'),
+        h('li', {}, 'Bookmark the game, and open it from that bookmark each time. A Home screen shortcut can keep its own separate saves, so pick one way and stay with it.'),
+        h('li', {}, 'After a big session, make a code above and keep it. If progress ever disappears, Import code brings it back.'))));
 }
 function levelsPanel(p) {
   const st = readProfileState(p.id); let read = clampLv(st.level.read), vocab = clampLv(st.level.vocab), lock = !!st.level.lock, school = st.settings.schoolOrder !== false;
